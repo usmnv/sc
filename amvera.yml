@@ -1,0 +1,18 @@
+meta:
+  environment: python
+  version: 3.11
+
+build:
+  docker:
+    file: Dockerfile
+
+deploy:
+  type: docker
+  port: 80
+  volumes:
+    - /app/data
+
+healthcheck:
+  path: /health
+  interval: 30
+  timeout: 5
