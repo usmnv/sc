@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -13,7 +14,7 @@ from handlers import start, admission, exchange, guide, faq, manager
 
 logging.basicConfig(level=logging.INFO)
 
-# ========== ПРОСТОЙ WEB-СЕРВЕР ДЛЯ HEALTHCHECK (НУЖЕН ДЛЯ AMVERA) ==========
+# ========== WEB-СЕРВЕР ДЛЯ HEALTHCHECK (АДАПТИРОВАН ДЛЯ KOYEB) ==========
 class HealthHandler(BaseHTTPRequestHandler):
     """Обрабатывает GET запросы для проверки работоспособности"""
     
@@ -33,9 +34,11 @@ class HealthHandler(BaseHTTPRequestHandler):
         pass
 
 def run_health_server():
-    """Запускает HTTP сервер на порту 80 для healthcheck"""
-    server = HTTPServer(('0.0.0.0', 80), HealthHandler)
-    logging.info("Healthcheck сервер запущен на порту 80")
+    """Запускает HTTP сервер на порту, который требует Koyeb"""
+    # Koyeb передаёт порт через переменную окружения PORT
+    port = int(os.environ.get('PORT', 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    logging.info(f"Healthcheck сервер запущен на порту {port}")
     server.serve_forever()
 
 # ========== ОСНОВНОЙ БОТ ==========
@@ -56,7 +59,7 @@ async def main():
     dp.include_router(faq.router)
     dp.include_router(manager.router)
     
-    # Запускаем healthcheck сервер в отдельном потоке (нужен для Amvera)
+    # Запускаем healthcheck сервер в отдельном потоке (нужен для Koyeb)
     health_thread = Thread(target=run_health_server, daemon=True)
     health_thread.start()
     
