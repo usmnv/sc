@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message, CallbackQuery, Contact
+from aiogram.types import Message, CallbackQuery, Contact, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 
 from database import user_exists, register_user, get_user
@@ -8,6 +8,21 @@ from keyboards import main_menu_keyboard
 from states import Registration
 
 router = Router()
+
+def phone_keyboard():
+    button = KeyboardButton(text="📱 Отправить номер телефона", request_contact=True)
+    return ReplyKeyboardMarkup(keyboard=[[button]], resize_keyboard=True)
+
+def goal_keyboard():
+    """Клавиатура с целями обучения"""
+    builder = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🎓 Бакалавриат", callback_data="goal_bachelor")],
+        [InlineKeyboardButton(text="🇨🇳 Изучение китайского языка", callback_data="goal_language")],
+        [InlineKeyboardButton(text="📚 Магистратура", callback_data="goal_master")],
+        [InlineKeyboardButton(text="📖 Подготовительные курсы", callback_data="goal_preparation")],
+        [InlineKeyboardButton(text="🏫 Другое", callback_data="goal_other")]
+    ])
+    return builder
 
 @router.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext):
@@ -28,7 +43,6 @@ async def cmd_start(message: Message, state: FSMContext):
         
         await state.update_data(name=name)
         
-        # Просим отправить контакт
         await message.answer(
             f"🎓 *Добро пожаловать в China Study Bot, {name}!*\n\n"
             f"Я помогу тебе:\n"
@@ -42,11 +56,6 @@ async def cmd_start(message: Message, state: FSMContext):
         )
         await state.set_state(Registration.waiting_phone)
 
-def phone_keyboard():
-    from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-    button = KeyboardButton(text="📱 Отправить номер телефона", request_contact=True)
-    return ReplyKeyboardMarkup(keyboard=[[button]], resize_keyboard=True)
-
 @router.message(Registration.waiting_phone, F.contact)
 async def process_phone(message: Message, state: FSMContext):
     contact = message.contact
@@ -54,6 +63,7 @@ async def process_phone(message: Message, state: FSMContext):
     
     await state.update_data(phone=phone)
     
+    # Убираем клавиатуру с контактом
     await message.answer(
         "🏙 *Из какого ты города?*\n\n"
         "Напиши название города (например: Москва, Пекин, Шанхай):",
@@ -74,37 +84,51 @@ async def process_phone_invalid(message: Message, state: FSMContext):
 @router.message(Registration.waiting_city)
 async def process_city(message: Message, state: FSMContext):
     await state.update_data(city=message.text)
+    
+    # Показываем кнопки с целями
     await message.answer(
         "🎯 *Какую цель ставишь?*\n\n"
-        "Например:\n"
-        "• Поступление в бакалавриат\n"
-        "• Изучение китайского языка\n"
-        "• Магистратура\n"
-        "• Подготовительные курсы",
-        parse_mode="Markdown"
+        "Выбери один из вариантов:",
+        parse_mode="Markdown",
+        reply_markup=goal_keyboard()
     )
-    await state.set_state(Registration.waiting_goal)
+    # Не меняем состояние, ждем callback
 
-@router.message(Registration.waiting_goal)
-async def process_goal(message: Message, state: FSMContext):
+@router.callback_query(F.data.startswith("goal_"))
+async def process_goal(callback: CallbackQuery, state: FSMContext):
+    goal_map = {
+        "goal_bachelor": "Поступление в бакалавриат",
+        "goal_language": "Изучение китайского языка",
+        "goal_master": "Магистратура",
+        "goal_preparation": "Подготовительные курсы",
+        "goal_other": "Другое"
+    }
+    
+    goal = goal_map.get(callback.data, "Не указано")
     data = await state.get_data()
-    tg_id = message.from_user.id
+    tg_id = callback.from_user.id
     
     await register_user(
         tg_id=tg_id,
         name=data["name"],
         phone=data["phone"],
         city=data["city"],
-        goal=message.text
+        goal=goal
     )
     
-    await message.answer(
+    await callback.message.edit_text(
         f"✅ *Регистрация завершена, {data['name']}!*\n\n"
         f"Теперь ты можешь пользоваться всеми функциями бота.",
+        parse_mode="Markdown"
+    )
+    
+    await callback.message.answer(
+        "🏠 *Главное меню*\n\nВыбери нужный раздел:",
         parse_mode="Markdown",
         reply_markup=main_menu_keyboard()
     )
     await state.clear()
+    await callback.answer()
 
 @router.callback_query(F.data == "back_main")
 async def back_to_main(callback: CallbackQuery):
