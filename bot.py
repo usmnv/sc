@@ -7,6 +7,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums.parse_mode import ParseMode
 
 from config import BOT_TOKEN
 from database import init_db
@@ -42,8 +44,11 @@ async def main():
         await init_db()
         logging.info("База данных инициализирована")
         
-        # Создаем бота и диспетчер
-        bot = Bot(token=BOT_TOKEN)
+        # Создаем бота с увеличенными таймаутами
+        bot = Bot(
+            token=BOT_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        )
         dp = Dispatcher(storage=MemoryStorage())
         
         # Подключаем все роутеры
@@ -60,10 +65,18 @@ async def main():
         
         # Запускаем бота
         logging.info("Бот запущен и готов к работе!")
-        await dp.start_polling(bot)
         
+        # Бесконечный polling с переподключением
+        while True:
+            try:
+                await dp.start_polling(bot)
+            except Exception as e:
+                logging.error(f"Ошибка в polling: {e}")
+                await asyncio.sleep(5)
+                
     except Exception as e:
         logging.error(f"Критическая ошибка: {e}")
+        await asyncio.sleep(10)
         sys.exit(1)
 
 if __name__ == "__main__":
