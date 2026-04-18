@@ -20,16 +20,16 @@ def programs_keyboard(programs: list) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for prog in programs:
         builder.button(text=prog["name"], callback_data=f"prog_{prog['code']}")
-    builder.button(text="◀ Назад", callback_data="back_main")
+    builder.button(text="◀ На главную", callback_data="back_main")
     builder.adjust(1)
     return builder.as_markup()
 
 def city_choice_keyboard(cities: list) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    for city in cities[:12]:  # Ограничим количество
+    for city in cities[:12]:
         builder.button(text=f"🏙 {city}", callback_data=f"city_{city}")
     builder.button(text="🔍 Поиск по названию", callback_data="city_search")
-    builder.button(text="◀ Назад к программам", callback_data="menu_admission")
+    builder.button(text="◀ Назад", callback_data="menu_admission")
     builder.adjust(2)
     return builder.as_markup()
 
